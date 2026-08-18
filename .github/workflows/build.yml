@@ -3,9 +3,9 @@ name: build
 # Builds the app image so an orchestrator can pull and run it; amd64 only, since
 # Livepeer GPU work is NVIDIA/amd64.
 #
-# This image is ~25 GB (CUDA devel, torch, TensorRT, ONNX Runtime), so it does not
+# This image is ~15 GB (torch, TensorRT, ONNX Runtime), so it does not
 # fit a GitHub-hosted runner as shipped: the job reclaims disk first, skips the
-# layer cache (a 25 GB image would blow the 10 GB Actions cache anyway), and does
+# layer cache (an image this size would blow the 10 GB Actions cache anyway), and does
 # not run on pull requests, where a build this size buys little for what it costs.
 #
 # GHCR needs no setup (ghcr.io/<owner>/<repo>, public if the repo is). Docker Hub
@@ -32,7 +32,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # A stock runner has roughly 25 GB free, which this image alone exceeds.
+      # A stock runner has roughly 25 GB free, which this image plus its build
+      # layers still crowds.
       # These are preinstalled toolchains the build never touches; dropping them
       # frees about 25 GB more.
       - name: Reclaim disk

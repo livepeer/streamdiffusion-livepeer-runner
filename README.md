@@ -106,7 +106,7 @@ The price is unchanged by the overlay: static runners advertise it from `runners
 
 CI publishes the image to `ghcr.io/livepeer/streamdiffusion-livepeer-runner` on `main` and `v*` tags. An operator then runs it with a `runners.json` like this repo's, pointed at wherever they run the container, and needs no credentials for a public package.
 
-The image is **~25 GB** (CUDA devel, torch, TensorRT, ONNX Runtime), which is more than a GitHub-hosted runner has free out of the box, so [build.yml](.github/workflows/build.yml) reclaims disk before building and skips the build on pull requests. Building locally is `docker compose build`.
+The image is **~15 GB** (torch, TensorRT, ONNX Runtime), which is still close enough to what a GitHub-hosted runner has free that [build.yml](.github/workflows/build.yml) reclaims disk before building and skips the build on pull requests. Building locally is `docker compose build`.
 
 To publish to Docker Hub as well, set the repository variable `DOCKERHUB_NAMESPACE` and the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. GHCR keeps working either way.
 

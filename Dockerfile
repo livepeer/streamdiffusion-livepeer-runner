@@ -36,8 +36,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m pip install --no-cache-dir \
         torch==2.7.1+cu128 torchvision==0.22.1+cu128 torchaudio==2.7.1+cu128 \
         --index-url https://download.pytorch.org/whl/cu128
-RUN python -m pip install --no-cache-dir \
-        "streamdiffusion[tensorrt,controlnet,ipadapter] @ git+https://github.com/daydreamlive/StreamDiffusion.git@94b9b96cb8a17d401ffbce516393d6482326ce62"
+# insightface (via the ipadapter extra) is sdist-only on PyPI, so it compiles a
+# Cython/C++ extension here. That toolchain is the one thing the devel base was
+# really providing; it is plain g++, nothing CUDA, so install it just for this
+# step and purge it in the same layer rather than shipping it.
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
+    && python -m pip install --no-cache-dir \
+        "streamdiffusion[tensorrt,controlnet,ipadapter] @ git+https://github.com/daydreamlive/StreamDiffusion.git@94b9b96cb8a17d401ffbce516393d6482326ce62" \
+    && apt-get purge -y --auto-remove build-essential \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Pulls the tensorrt + cuDNN wheels, polygraphy and onnx-graphsurgeon. Pure pip:
 # no compiler and no CUDA headers are involved.
