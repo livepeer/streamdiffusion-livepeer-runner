@@ -1,0 +1,85 @@
+name: build
+
+# Builds the app image so an orchestrator can pull and run it; amd64 only, since
+# Livepeer GPU work is NVIDIA/amd64.
+#
+# This image is ~25 GB (CUDA devel, torch, TensorRT, ONNX Runtime), so it does not
+# fit a GitHub-hosted runner as shipped: the job reclaims disk first, skips the
+# layer cache (a 25 GB image would blow the 10 GB Actions cache anyway), and does
+# not run on pull requests, where a build this size buys little for what it costs.
+#
+# GHCR needs no setup (ghcr.io/<owner>/<repo>, public if the repo is). Docker Hub
+# is optional and additive: set the DOCKERHUB_NAMESPACE variable plus the
+# DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets.
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # publishing to ghcr.io
+    steps:
+      - uses: actions/checkout@v7
+
+      # A stock runner has roughly 25 GB free, which this image alone exceeds.
+      # These are preinstalled toolchains the build never touches; dropping them
+      # frees about 25 GB more.
+      - name: Reclaim disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/boost /usr/local/lib/node_modules \
+            "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune --all --force
+          df -h /
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          # Second line is empty unless Docker Hub is configured, and empty
+          # entries are ignored, so this is GHCR-only by default.
+          images: |
+            ghcr.io/${{ github.repository }}
+            ${{ vars.DOCKERHUB_NAMESPACE && format('{0}/{1}', vars.DOCKERHUB_NAMESPACE, github.event.repository.name) || '' }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: vars.DOCKERHUB_NAMESPACE != ''
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

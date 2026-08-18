@@ -1,0 +1,21 @@
+name: lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      # Runs every hook in .pre-commit-config.yaml against all files.
+      - uses: pre-commit/action@v3.0.1
+      # Parses and merges the compose file; builds and starts nothing.
+      # The Dockerfile is covered by build.yml.
+      - name: Validate compose
+        run: docker compose -f compose.yml config --quiet

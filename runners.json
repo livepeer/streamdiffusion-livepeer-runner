@@ -1,0 +1,13 @@
+{
+  "runners": [
+    {
+      "label": "streamdiffusion",
+      "app": "livepeer/streamdiffusion",
+      "runner_url": "http://app:7860",
+      "health_url": "/api/queue",
+      "mode": "persistent",
+      "capacity": 1,
+      "price_info": { "price": 0.01 }
+    }
+  ]
+}

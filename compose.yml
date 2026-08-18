@@ -1,0 +1,58 @@
+# End-to-end offchain demo: orchestrator + the StreamDiffusion server. Free, no wallet.
+#
+#   docker compose up -d --build
+#   ffmpeg ... | uv run client.py | ffplay -f mjpeg -i -
+#
+# The app is attached STATICALLY: the orchestrator reads runners.json
+# (-liveRunnerConfig), health-polls the app, and reverse-proxies everything else,
+# so the container itself holds no Livepeer code. Requires an NVIDIA GPU.
+#
+# Self-contained on purpose: nothing here is pulled in from a parent directory,
+# so this works wherever you copy it.
+
+services:
+  orchestrator:
+    image: livepeer/go-livepeer:v0.9.1
+    container_name: streamdiffusion_runner_orchestrator
+    # Two distinct addresses:
+    #   serviceAddr    advertised to external clients in discovery responses,
+    #                  so it must be reachable from the host (published port).
+    #   liveRunnerAddr control-plane URL runners use for heartbeat + trickle,
+    #                  so it must resolve on the compose network.
+    # The image entrypoint is `livepeer`, so `command:` is flags only.
+    command:
+      - -orchestrator
+      - -useLiveRunners
+      - -serviceAddr=127.0.0.1:8935
+      - -httpAddr=0.0.0.0:8935
+      - -liveRunnerAddr=https://orchestrator:8935
+      - -orchSecret=abcdef
+      - -network=offchain
+      - -liveRunnerConfig=/config/runners.json
+      - -monitor=false
+      - -v=6
+    ports:
+      - "8935:8935"
+    volumes:
+      - ./runners.json:/config/runners.json:ro
+    # 8935 is HTTPS and the image has only openssl, no curl or wget. A raw TCP
+    # probe would open the socket without a handshake and log a TLS error every
+    # interval, so speak real TLS; matching "200 OK" also proves it is serving.
+    healthcheck:
+      test: printf 'GET /healthz HTTP/1.0\r\n\r\n' | openssl s_client -connect 127.0.0.1:8935 -quiet 2>/dev/null | grep -q '200 OK'
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 5s
+
+  app:
+    build: .
+    container_name: streamdiffusion_runner_app
+    # StreamDiffusion needs a GPU; compiled engines + the HF cache live in ./models
+    # so they survive a rebuild (the first stream open compiles them, slowly).
+    gpus: all
+    volumes:
+      - ./models:/models
+    depends_on:
+      orchestrator:
+        condition: service_healthy

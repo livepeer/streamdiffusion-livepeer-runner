@@ -1,0 +1,61 @@
+# On-chain (paid) overlay. Layer it on the offchain base:
+#   docker compose -f compose.yml -f compose.onchain.yml up -d --build
+#   ffmpeg ... | uv run client.py --signer http://localhost:7936 | ffplay -f mjpeg -i -
+#
+# Adds a remote signer holding the payer wallet and re-points the orchestrator
+# on-chain, so the session is metered and paid for while it is held. The price
+# itself is unchanged: static runners advertise it from runners.json, which the
+# base file already mounts. Needs a local .env (gitignored): copy .env.example.
+
+services:
+  signer:
+    # A standalone go-livepeer in signer mode. It holds the funded payer wallet
+    # and mints tickets; it cannot run offchain. The client reaches it via --signer.
+    image: livepeer/go-livepeer:v0.9.1
+    container_name: streamdiffusion_runner_signer
+    command:
+      - -remoteSigner
+      - -network=${NETWORK}
+      - -ethUrl=${ETH_RPC_URL}
+      - -ethKeystorePath=/keystore
+      - -ethAcctAddr=${SIGNER_ETH_ACCT}
+      - -ethPassword=${SIGNER_ETH_PASSWORD}
+      - -httpAddr=0.0.0.0:7936
+      - -maxPricePerUnit=${MAX_PRICE_PER_UNIT}
+      - -v=6
+      # LOCAL DEMO ONLY. This skips signer caller-auth: it binds 0.0.0.0 and
+      # signs for anyone who can reach it, which spends your deposit. In
+      # production authorize callers with -remoteSignerWebhookUrl instead.
+      - -remoteSignerAllowNoAuth
+    ports:
+      - "7936:7936"
+    volumes:
+      - ${SIGNER_KEYSTORE_DIR}:/keystore:ro
+
+  orchestrator:
+    command:
+      - -orchestrator
+      - -useLiveRunners
+      - -serviceAddr=127.0.0.1:8935
+      - -httpAddr=0.0.0.0:8935
+      - -liveRunnerAddr=https://orchestrator:8935
+      - -orchSecret=abcdef
+      - -network=${NETWORK}
+      - -ethUrl=${ETH_RPC_URL}
+      - -ethKeystorePath=/keystore
+      - -ethAcctAddr=${ORCH_ETH_ACCT}
+      - -ethPassword=${ORCH_ETH_PASSWORD}
+      - -ethOrchAddr=${ORCH_ONCHAIN_ADDR}
+      # Price comes from runners.json; -pricePerUnit only sets the unused legacy
+      # base price, but an on-chain O won't boot without it.
+      - -pricePerUnit=0
+      # Expected value per ticket. A payment needs fee / ticketEV tickets and the
+      # signer signs at most 100 at once, which is what caps the price.
+      - -ticketEV=10000000000
+      - -maxFaceValue=4000000000000000
+      - -liveRunnerConfig=/config/runners.json
+      - -monitor=false
+      - -v=6
+    volumes:
+      - ./runners.json:/config/runners.json:ro
+      - ${ORCH_KEYSTORE_DIR}:/keystore:ro

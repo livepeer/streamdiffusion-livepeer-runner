@@ -1,0 +1,9 @@
+[project]
+name = "streamdiffusion-livepeer-runner"
+version = "0.1.0"
+description = "Realtime prompt-driven img2img on the Livepeer network (StreamDiffusion over WebSocket)."
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp",                  # client: the app's own WebSocket + MJPEG protocol
+    "livepeer-gateway>=1.0.0",
+]

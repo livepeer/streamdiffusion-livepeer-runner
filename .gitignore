@@ -1,0 +1,23 @@
+# Vim swap files
+*.swp
+*.swo
+*.swn
+
+# Python
+__pycache__/
+*.pyc
+.venv
+uv.lock
+.ruff_cache/
+
+# Local environment / secrets
+.env
+.DS_Store
+
+# IDE
+.vscode
+*.code-workspace
+
+# Compiled TensorRT engines + HF cache
+models
+*.mjpeg
