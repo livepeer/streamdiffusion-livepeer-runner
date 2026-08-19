@@ -12,14 +12,14 @@ ffmpeg -f v4l2 -input_format mjpeg -framerate 30 -video_size 640x480 -i /dev/vid
   | ffplay -f mjpeg -fflags nobuffer -flags low_delay -i -
 ```
 
-|              |                                            |
-| ------------ | ------------------------------------------ |
-| App id       | `livepeer/streamdiffusion`                 |
-| Runner mode  | persistent (held-open session)             |
-| Registration | static (`runners.json`)                    |
-| Transport    | WebSocket + MJPEG (the app's own protocol) |
-| Pricing      | hour (metered per second while held)       |
-| Port         | 7860 (the StreamDiffusion server)          |
+|              |                                               |
+| ------------ | --------------------------------------------- |
+| App id       | `livepeer/streamdiffusion`                    |
+| Runner mode  | persistent (held-open session)                |
+| Registration | static (`runners.json` + health poll)         |
+| Transport    | WebSocket + HTTP (JPEG frames up, MJPEG down) |
+| Pricing      | hour (metered per second while held)          |
+| Port         | 7860 (the StreamDiffusion server)             |
 
 **Requires an NVIDIA GPU.** You also need **Docker** (with the [NVIDIA container toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)), [**uv**](https://docs.astral.sh/uv/), and **ffmpeg** for capture and playback.
 
@@ -33,12 +33,45 @@ All the Livepeer integration therefore lives in [client.py](client.py). Grep `# 
 2. `ws_connect` — from here on it is the app's own protocol, over that url.
 3. `stop_runner_session` — release the session, which settles payment on-chain.
 
-The server's protocol, for reference:
+### The protocol split
 
-- `GET /api/queue` — liveness (the runner's `health_url`).
-- `WS /api/ws/{uuid}` — input: control messages plus JPEG frames.
-- `GET /api/stream/{uuid}` — output: MJPEG (`multipart/x-mixed-replace`). Opening it builds the pipeline and drives the per-frame pump.
-- `POST /api/blending` — set the prompt.
+Input, output and prompt control are **three separate channels**, which is easy to forget: frames go up a WebSocket, frames come back down a plain HTTP response, and the prompt is a third call that touches neither.
+
+| Channel  | Endpoint                 | Carries                                               |
+| -------- | ------------------------ | ----------------------------------------------------- |
+| Input    | `WS /api/ws/{uuid}`      | control messages plus input JPEG frames               |
+| Output   | `GET /api/stream/{uuid}` | MJPEG out (`multipart/x-mixed-replace`)               |
+| Prompt   | `POST /api/blending`     | prompt updates, at any time                           |
+| Liveness | `GET /api/queue`         | the runner's `health_url`, polled by the orchestrator |
+
+Two consequences worth knowing. **Opening the output stream is what builds the pipeline** and drives the per-frame pump, so nothing happens until you `GET` it, and the first open compiles TensorRT engines. And the same `{uuid}` ties the two halves together, so input and output are one session in two directions, not a request and a response.
+
+```mermaid
+sequenceDiagram
+    participant C as client.py
+    participant O as orchestrator
+    participant A as StreamDiffusion (port 7860)
+
+    Note over O,A: static registration, no SDK in the container
+    loop every few seconds
+        O->>A: GET /api/queue
+    end
+
+    C->>O: reserve_session(livepeer/streamdiffusion)
+    O-->>C: proxied app_url, meter starts
+
+    Note over C,A: from here it is the app's own protocol, the orchestrator only forwards
+    C->>O: POST /api/blending
+    O->>A: POST /api/blending
+    C->>O: WS /api/ws/{uuid} plus JPEG frames
+    O->>A: WS /api/ws/{uuid}
+    C->>O: GET /api/stream/{uuid}
+    O->>A: GET /api/stream/{uuid}
+    A-->>O: MJPEG
+    O-->>C: MJPEG
+
+    C->>O: stop_runner_session, settles on-chain
+```
 
 The client reads MJPEG on stdin and writes MJPEG on stdout, so ffmpeg does capture and playback and the client stays a pipe stage. Input frames are kept drop-to-latest: a slow diffuser falls behind rather than building a backlog.
 
@@ -63,6 +96,14 @@ Then restyle a webcam, cycling prompts hands-free:
 ffmpeg -f v4l2 -input_format mjpeg -framerate 30 -video_size 640x480 -i /dev/video0 \
   -vf scale=512:512 -f image2pipe -c:v mjpeg -q:v 5 - \
   | uv run client.py \
+  | ffplay -f mjpeg -fflags nobuffer -flags low_delay -i -
+```
+
+**No webcam?** ffmpeg synthesises one, which is also the fastest way to prove the stack works:
+
+```sh
+ffmpeg -f lavfi -i testsrc2=size=512x512:rate=15 -f image2pipe -c:v mjpeg -q:v 5 - \
+  | uv run client.py --prompt 'van Gogh oil painting, vivid colors' \
   | ffplay -f mjpeg -fflags nobuffer -flags low_delay -i -
 ```
 
