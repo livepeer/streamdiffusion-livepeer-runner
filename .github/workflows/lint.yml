@@ -15,7 +15,14 @@ jobs:
           python-version: "3.12"
       # Runs every hook in .pre-commit-config.yaml against all files.
       - uses: pre-commit/action@v3.0.1
-      # Parses and merges the compose file; builds and starts nothing.
+      # Parses and merges the compose files; builds and starts nothing.
       # The Dockerfile is covered by build.yml.
+      #
+      # The on-chain overlay is the one nobody runs before merging: it needs a
+      # wallet, an RPC and a keystore. Interpolating .env.example also proves that
+      # file still lists every variable the overlay reads.
       - name: Validate compose
-        run: docker compose -f compose.yml config --quiet
+        run: |
+          docker compose -f compose.yml config --quiet
+          docker compose --env-file .env.example \
+            -f compose.yml -f compose.onchain.yml config --quiet
