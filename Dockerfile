@@ -9,14 +9,9 @@
 # cumulo-autumn repo, not the fork, so it would not run this rewritten server.
 # We clone the fork at a pinned commit instead.
 #
-# Base is plain python-slim, NOT nvidia/cuda:*-devel, because nothing here
-# compiles against CUDA: torch carries its own runtime in the cu128 wheels, and
-# streamdiffusion.tools.install-tensorrt is pure pip — it installs the tensorrt
-# and nvidia-cudnn-cu12 wheels and reads torch.version.cuda, never nvcc.
-# Upstream's devel base is a single commit from Dec 2023, back when xformers and
-# stable-fast still built native extensions; this image installs neither. The
-# driver arrives through the NVIDIA container runtime (compose `gpus: all`),
-# which is how the other Livepeer runner examples get a GPU too.
+# Base is python-slim, not nvidia/cuda:*-devel: nothing here compiles against
+# CUDA (torch's cu128 wheels carry the runtime, install-tensorrt is pure pip),
+# and the driver arrives through the container runtime.
 FROM python:3.11-slim
 
 LABEL org.opencontainers.image.title="streamdiffusion-livepeer-runner"
@@ -36,32 +31,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m pip install --no-cache-dir \
         torch==2.7.1+cu128 torchvision==0.22.1+cu128 torchaudio==2.7.1+cu128 \
         --index-url https://download.pytorch.org/whl/cu128
-# insightface (via the ipadapter extra) is sdist-only on PyPI, so it compiles a
-# Cython/C++ extension here. That toolchain is the one thing the devel base was
-# really providing; it is plain g++, nothing CUDA, so install it just for this
-# step and purge it in the same layer rather than shipping it.
+# insightface (ipadapter extra) is sdist-only, so it compiles here. Plain g++,
+# nothing CUDA: install for this step only, purge in the same layer.
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential \
     && python -m pip install --no-cache-dir \
         "streamdiffusion[tensorrt,controlnet,ipadapter] @ git+https://github.com/daydreamlive/StreamDiffusion.git@94b9b96cb8a17d401ffbce516393d6482326ce62" \
     && apt-get purge -y --auto-remove build-essential \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Pulls the tensorrt + cuDNN wheels, polygraphy and onnx-graphsurgeon. Pure pip:
-# no compiler and no CUDA headers are involved.
+# Pure pip: the tensorrt + cuDNN wheels, polygraphy, onnx-graphsurgeon.
 RUN python -m streamdiffusion.tools.install-tensorrt
 
-# With no system CUDA tree, the dynamic loader has to find cuDNN, cuBLAS and
-# TensorRT inside the wheels. Register whatever lib dirs the wheels actually
-# installed rather than hardcoding paths that move on every version bump.
+# No system CUDA tree, so point the loader at the wheels' lib dirs. Globbed
+# rather than hardcoded: the paths move on every version bump.
 RUN python - <<'PY'
 import glob, os, site
 dirs = sorted(d for r in site.getsitepackages()
               for pat in ("nvidia/*/lib", "tensorrt_libs", "tensorrt/lib")
               for d in glob.glob(r + "/" + pat))
 open("/etc/ld.so.conf.d/nvidia-wheels.conf", "w").write(chr(10).join(dirs) + chr(10))
-# The wheels ship only versioned SONAMEs (libcudart.so.12). The devel base used to
-# supply the unversioned dev symlinks, and parts of the TensorRT path dlopen the
-# plain name -- "libcudart.so" -- so recreate what the -dev packages gave us.
+# Wheels ship only versioned SONAMEs, but parts of the TensorRT path dlopen the
+# plain "libcudart.so", so recreate the symlinks the -dev packages gave us.
 for d in dirs:
     for so in sorted(glob.glob(d + "/*.so.*"), key=len):
         base = so.split(".so.")[0] + ".so"
@@ -72,9 +62,8 @@ print(*dirs, sep=chr(10))
 PY
 RUN ldconfig
 
-# Fail the build rather than the first stream if the CUDA stack cannot load.
-# install-tensorrt pins nvidia-cudnn-cu12, which can disagree with the cuDNN
-# torch wants, and on this base there is no system copy to fall back on.
+# Fail the build, not the first stream: install-tensorrt pins a cuDNN that can
+# disagree with torch's, and there is no system copy to fall back on.
 RUN python - <<'PY'
 import ctypes, glob, site, sys
 import torch, tensorrt
@@ -110,9 +99,6 @@ RUN rm -rf engines && ln -s /models/engines engines
 EXPOSE 7860
 
 # --api-only: skip the built Node frontend (a Livepeer client drives the API directly).
-#
-# /models/engines is created here, not at build time: the volume mounts over
-# /models at start and would mask a build-time mkdir. The symlink above would
-# then be dangling, and Path.mkdir(exist_ok=True) re-raises on a dangling
-# symlink, so the first stream dies with FileExistsError: 'engines'.
+# /models/engines is made at start because the volume masks a build-time mkdir,
+# and mkdir(exist_ok=True) re-raises on the symlink while it dangles.
 CMD ["sh", "-c", "mkdir -p /models/engines && exec python main.py --host=0.0.0.0 --port=7860 --acceleration=tensorrt --api-only"]
