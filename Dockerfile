@@ -42,40 +42,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
 # Pure pip: the tensorrt + cuDNN wheels, polygraphy, onnx-graphsurgeon.
 RUN python -m streamdiffusion.tools.install-tensorrt
 
-# No system CUDA tree, so point the loader at the wheels' lib dirs. Globbed
-# rather than hardcoded: the paths move on every version bump.
-RUN python - <<'PY'
-import glob, os, site
-dirs = sorted(d for r in site.getsitepackages()
-              for pat in ("nvidia/*/lib", "tensorrt_libs", "tensorrt/lib")
-              for d in glob.glob(r + "/" + pat))
-open("/etc/ld.so.conf.d/nvidia-wheels.conf", "w").write(chr(10).join(dirs) + chr(10))
-# Wheels ship only versioned SONAMEs, but parts of the TensorRT path dlopen the
-# plain "libcudart.so", so recreate the symlinks the -dev packages gave us.
-for d in dirs:
-    for so in sorted(glob.glob(d + "/*.so.*"), key=len):
-        base = so.split(".so.")[0] + ".so"
-        if not os.path.exists(base):
-            os.symlink(os.path.basename(so), base)
-            print("linked", base)
-print(*dirs, sep=chr(10))
-PY
-RUN ldconfig
+# polygraphy globs libcudart.so* across LD_LIBRARY_PATH, /usr/local/cuda/lib64,
+# /usr/lib and /lib. None of those exist here, so point it at the wheels.
+ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib:/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.11/site-packages/tensorrt_libs
 
-# Fail the build, not the first stream: install-tensorrt pins a cuDNN that can
-# disagree with torch's, and there is no system copy to fall back on.
+# Fail the build, not the first stream. Also catches a python bump moving the
+# paths hardcoded above.
 RUN python - <<'PY'
-import ctypes, glob, site, sys
 import torch, tensorrt
+from polygraphy.cuda.cuda import Cuda
 print("torch", torch.__version__, "/ cuda", torch.version.cuda, "/ tensorrt", tensorrt.__version__)
-libs = [p for r in site.getsitepackages() for p in glob.glob(r + "/nvidia/cudnn/lib/libcudnn.so.*")]
-if not libs:
-    sys.exit("cuDNN wheel not found")
-ctypes.CDLL(sorted(libs)[0])
-print("cudnn loadable:", sorted(libs)[0])
-for soname in ("libcudart.so", "libnvinfer.so"):
-    ctypes.CDLL(soname)
-    print("dlopen ok:", soname)
+Cuda()
+print("polygraphy found the cuda runtime")
 PY
 
 # The pip package doesn't ship the demo/ dir, so clone the fork (pinned) for the server.
