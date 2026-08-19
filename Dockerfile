@@ -98,4 +98,9 @@ RUN rm -rf engines && ln -s /models/engines engines
 EXPOSE 7860
 
 # --api-only: skip the built Node frontend (a Livepeer client drives the API directly).
-CMD ["python", "main.py", "--host=0.0.0.0", "--port=7860", "--acceleration=tensorrt", "--api-only"]
+#
+# /models/engines is created here, not at build time: the volume mounts over
+# /models at start and would mask a build-time mkdir. The symlink above would
+# then be dangling, and Path.mkdir(exist_ok=True) re-raises on a dangling
+# symlink, so the first stream dies with FileExistsError: 'engines'.
+CMD ["sh", "-c", "mkdir -p /models/engines && exec python main.py --host=0.0.0.0 --port=7860 --acceleration=tensorrt --api-only"]
