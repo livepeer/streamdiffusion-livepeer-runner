@@ -99,6 +99,14 @@ ffmpeg -f v4l2 -input_format mjpeg -framerate 30 -video_size 640x480 -i /dev/vid
   | ffplay -f mjpeg -fflags nobuffer -flags low_delay -i -
 ```
 
+**No webcam?** ffmpeg synthesises one, which is also the fastest way to prove the stack works:
+
+```sh
+ffmpeg -f lavfi -i testsrc2=size=512x512:rate=15 -f image2pipe -c:v mjpeg -q:v 5 - \
+  | uv run client.py --prompt 'van Gogh oil painting, vivid colors' \
+  | ffplay -f mjpeg -fflags nobuffer -flags low_delay -i -
+```
+
 Device numbers vary, so confirm your camera node first (`v4l2-ctl --list-devices`, `ffplay -f v4l2 -i /dev/videoN`). macOS: `-f avfoundation -i 0`. Windows: `-f dshow -i video="<name>"`.
 
 Any MJPEG source works, so a file restyles too — but pace it with `-re`, or ffmpeg decodes the whole file at once and the run ends the moment the pipe closes:
