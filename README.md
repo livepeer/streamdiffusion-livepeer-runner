@@ -106,13 +106,11 @@ The price is unchanged by the overlay: static runners advertise it from `runners
 
 CI publishes the image to `ghcr.io/livepeer/streamdiffusion-livepeer-runner` on `main` and `v*` tags. Tags: `latest` (current `main`), `stable` (latest `v*` release), `1.2` / `1.2.3`, `sha-<short>`. The package is public, so pulling needs no account and no login. An operator then runs it with a `runners.json` like this repo's, pointed at wherever they run the container.
 
-[compose.image.yml](compose.image.yml) swaps the local build for that image, which is the sane path unless you are changing the Dockerfile:
+`docker compose up` always builds from source. To run the published image instead, which is the sane path unless you are changing the Dockerfile:
 
 ```sh
-docker compose -f compose.yml -f compose.image.yml up -d
+docker compose up -d --pull always
 ```
-
-The base [compose.yml](compose.yml) always builds from source, so the registry is reached only when you ask for it by adding the overlay. It stacks with the on-chain one (`-f compose.yml -f compose.onchain.yml -f compose.image.yml`).
 
 The image is **~15 GB** (torch, TensorRT, ONNX Runtime), which is still close enough to what a GitHub-hosted runner has free that [build.yml](.github/workflows/build.yml) reclaims disk before building and skips the build on pull requests. Building locally is `docker compose build`.
 
