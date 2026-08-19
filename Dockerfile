@@ -54,11 +54,20 @@ RUN python -m streamdiffusion.tools.install-tensorrt
 # TensorRT inside the wheels. Register whatever lib dirs the wheels actually
 # installed rather than hardcoding paths that move on every version bump.
 RUN python - <<'PY'
-import glob, site
+import glob, os, site
 dirs = sorted(d for r in site.getsitepackages()
               for pat in ("nvidia/*/lib", "tensorrt_libs", "tensorrt/lib")
               for d in glob.glob(r + "/" + pat))
 open("/etc/ld.so.conf.d/nvidia-wheels.conf", "w").write(chr(10).join(dirs) + chr(10))
+# The wheels ship only versioned SONAMEs (libcudart.so.12). The devel base used to
+# supply the unversioned dev symlinks, and parts of the TensorRT path dlopen the
+# plain name -- "libcudart.so" -- so recreate what the -dev packages gave us.
+for d in dirs:
+    for so in sorted(glob.glob(d + "/*.so.*"), key=len):
+        base = so.split(".so.")[0] + ".so"
+        if not os.path.exists(base):
+            os.symlink(os.path.basename(so), base)
+            print("linked", base)
 print(*dirs, sep=chr(10))
 PY
 RUN ldconfig
@@ -75,6 +84,9 @@ if not libs:
     sys.exit("cuDNN wheel not found")
 ctypes.CDLL(sorted(libs)[0])
 print("cudnn loadable:", sorted(libs)[0])
+for soname in ("libcudart.so", "libnvinfer.so"):
+    ctypes.CDLL(soname)
+    print("dlopen ok:", soname)
 PY
 
 # The pip package doesn't ship the demo/ dir, so clone the fork (pinned) for the server.
