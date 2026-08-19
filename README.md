@@ -121,7 +121,7 @@ CI runs the same hooks, checks the compose file parses, and builds the image.
 
 ## License and attribution
 
-This repo is an **example**, not a supported Livepeer artifact. The wrapper here (Dockerfile, [client.py](client.py), the compose files, [runners.json](runners.json)) is MIT, and CI publishing to `ghcr.io/livepeer/` is packaging convenience so an operator can pull it, not a product commitment.
+This repo is an **example** of how to run StreamDiffusion on the [live runner](https://github.com/livepeer/go-livepeer/blob/master/doc/live-runner.md), not a production-ready pipeline. The wrapper here (Dockerfile, [client.py](client.py), the compose files, [runners.json](runners.json)) is MIT, and CI publishing to `ghcr.io/livepeer/` is packaging convenience so an operator can pull it, not a product commitment.
 
 What runs inside the image is daydream's [StreamDiffusion](https://github.com/daydreamlive/StreamDiffusion), itself a fork of [cumulo-autumn/StreamDiffusion](https://github.com/cumulo-autumn/StreamDiffusion). Both are **Apache-2.0**, and this repo builds the fork pinned at `94b9b96` and **unmodified**, so redistribution is permitted and there are no changes to state under section 4(b). The fork ships no `NOTICE` file; its `LICENSE` travels in the image at `/src/LICENSE`. Model weights are downloaded from Hugging Face on first run under their own licenses and are not redistributed here.
 
