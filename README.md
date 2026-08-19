@@ -106,7 +106,7 @@ The price is unchanged by the overlay: static runners advertise it from `runners
 
 CI publishes the image to `ghcr.io/livepeer/streamdiffusion-livepeer-runner` on `main` and `v*` tags. An operator then runs it with a `runners.json` like this repo's, pointed at wherever they run the container, and needs no credentials for a public package.
 
-The image is **~25 GB** (CUDA devel, torch, TensorRT, ONNX Runtime), which is more than a GitHub-hosted runner has free out of the box, so [build.yml](.github/workflows/build.yml) reclaims disk before building and skips the build on pull requests. Building locally is `docker compose build`.
+The image is **~15 GB** (torch, TensorRT, ONNX Runtime), which is still close enough to what a GitHub-hosted runner has free that [build.yml](.github/workflows/build.yml) reclaims disk before building and skips the build on pull requests. Building locally is `docker compose build`.
 
 To publish to Docker Hub as well, set the repository variable `DOCKERHUB_NAMESPACE` and the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. GHCR keeps working either way.
 
@@ -118,6 +118,12 @@ uvx pre-commit run --all-files
 ```
 
 CI runs the same hooks, checks the compose file parses, and builds the image.
+
+## License and attribution
+
+This repo is an **example** of how to run StreamDiffusion on the [live runner](https://github.com/livepeer/go-livepeer/blob/master/doc/live-runner.md), not a production-ready pipeline. The wrapper here (Dockerfile, [client.py](client.py), the compose files, [runners.json](runners.json)) is MIT, and CI publishing to `ghcr.io/livepeer/` is packaging convenience so an operator can pull it, not a product commitment.
+
+What runs inside the image is daydream's [StreamDiffusion](https://github.com/daydreamlive/StreamDiffusion), itself a fork of [cumulo-autumn/StreamDiffusion](https://github.com/cumulo-autumn/StreamDiffusion). Both are **Apache-2.0**, and this repo builds the fork pinned at `94b9b96` and **unmodified**, so redistribution is permitted and there are no changes to state under section 4(b). The fork ships no `NOTICE` file; its `LICENSE` travels in the image at `/src/LICENSE`. Model weights are downloaded from Hugging Face on first run under their own licenses and are not redistributed here.
 
 ## Building your own
 
