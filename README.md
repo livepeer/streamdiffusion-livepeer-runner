@@ -12,14 +12,14 @@ ffmpeg -f v4l2 -input_format mjpeg -framerate 30 -video_size 640x480 -i /dev/vid
   | ffplay -f mjpeg -fflags nobuffer -flags low_delay -i -
 ```
 
-|              |                                            |
-| ------------ | ------------------------------------------ |
-| App id       | `livepeer/streamdiffusion`                 |
-| Runner mode  | persistent (held-open session)             |
-| Registration | static (`runners.json`)                    |
-| Transport    | WebSocket + MJPEG (the app's own protocol) |
-| Pricing      | hour (metered per second while held)       |
-| Port         | 7860 (the StreamDiffusion server)          |
+|              |                                               |
+| ------------ | --------------------------------------------- |
+| App id       | `livepeer/streamdiffusion`                    |
+| Runner mode  | persistent (held-open session)                |
+| Registration | static (`runners.json` + health poll)         |
+| Transport    | WebSocket + HTTP (JPEG frames up, MJPEG down) |
+| Pricing      | hour (metered per second while held)          |
+| Port         | 7860 (the StreamDiffusion server)             |
 
 **Requires an NVIDIA GPU.** You also need **Docker** (with the [NVIDIA container toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)), [**uv**](https://docs.astral.sh/uv/), and **ffmpeg** for capture and playback.
 
