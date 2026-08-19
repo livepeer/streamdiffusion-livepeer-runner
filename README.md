@@ -52,18 +52,18 @@ sequenceDiagram
     participant O as orchestrator
     participant A as StreamDiffusion (port 7860)
 
-    Note over O,A: static registration: runners.json names the app,<br/>so the container needs no SDK
+    Note over O,A: static registration, no SDK in the container
     loop every few seconds
         O->>A: GET /api/queue
     end
 
-    C->>O: reserve_session("livepeer/streamdiffusion")
+    C->>O: reserve_session(livepeer/streamdiffusion)
     O-->>C: proxied app_url, meter starts
 
-    Note over C,A: from here it is the app's own protocol;<br/>the orchestrator only forwards
+    Note over C,A: from here it is the app's own protocol, the orchestrator only forwards
     C->>O: POST /api/blending
     O->>A: POST /api/blending
-    C->>O: WS /api/ws/{uuid} + JPEG frames
+    C->>O: WS /api/ws/{uuid} plus JPEG frames
     O->>A: WS /api/ws/{uuid}
     C->>O: GET /api/stream/{uuid}
     O->>A: GET /api/stream/{uuid}
