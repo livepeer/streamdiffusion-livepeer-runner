@@ -39,22 +39,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends build-essential
     && apt-get purge -y --auto-remove build-essential \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Pure pip: the tensorrt + cuDNN wheels, polygraphy, onnx-graphsurgeon.
-RUN python -m streamdiffusion.tools.install-tensorrt
-
-# polygraphy globs libcudart.so* across LD_LIBRARY_PATH, /usr/local/cuda/lib64,
-# /usr/lib and /lib. None of those exist here, so point it at the wheels.
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib:/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.11/site-packages/tensorrt_libs
 
-# Fail the build, not the first stream. Also catches a python bump moving the
-# paths hardcoded above.
-RUN python - <<'PY'
-import torch, tensorrt
-from polygraphy.cuda.cuda import Cuda
-print("torch", torch.__version__, "/ cuda", torch.version.cuda, "/ tensorrt", tensorrt.__version__)
-Cuda()
-print("polygraphy found the cuda runtime")
-PY
+# Pure pip: the tensorrt + cuDNN wheels, polygraphy, onnx-graphsurgeon. polygraphy
+# globs libcudart.so* over LD_LIBRARY_PATH, which on slim is the only place it
+# will find one; the check fails the build rather than the first stream.
+RUN python -m streamdiffusion.tools.install-tensorrt \
+ && python -c "import torch,tensorrt; from polygraphy.cuda.cuda import Cuda; Cuda(); print('ok',torch.__version__,tensorrt.__version__)"
 
 # The pip package doesn't ship the demo/ dir, so clone the fork (pinned) for the server.
 RUN git clone https://github.com/daydreamlive/StreamDiffusion.git /src \
