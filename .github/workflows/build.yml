@@ -8,9 +8,10 @@ name: build
 # layer cache (an image this size would blow the 10 GB Actions cache anyway), and does
 # not run on pull requests, where a build this size buys little for what it costs.
 #
-# GHCR needs no setup (ghcr.io/<owner>/<repo>, public if the repo is). Docker Hub
-# is optional and additive: set the DOCKERHUB_NAMESPACE variable plus the
-# DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets.
+# GHCR needs no stored credentials: the built-in GITHUB_TOKEN publishes, and the
+# package is public, so pulling needs none either. Docker Hub is deliberately not
+# a second target: livepeer/ there is a curated product namespace, and this is an
+# example.
 
 on:
   push:
@@ -48,11 +49,8 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          # Second line is empty unless Docker Hub is configured, and empty
-          # entries are ignored, so this is GHCR-only by default.
-          images: |
-            ghcr.io/${{ github.repository }}
-            ${{ vars.DOCKERHUB_NAMESPACE && format('{0}/{1}', vars.DOCKERHUB_NAMESPACE, github.event.repository.name) || '' }}
+          # Owner comes from the repo, so a fork publishes under its own namespace.
+          images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short
@@ -68,13 +66,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to Docker Hub
-        if: vars.DOCKERHUB_NAMESPACE != ''
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push
         uses: docker/build-push-action@v7

@@ -18,4 +18,6 @@ jobs:
       # Parses and merges the compose file; builds and starts nothing.
       # The Dockerfile is covered by build.yml.
       - name: Validate compose
-        run: docker compose -f compose.yml config --quiet
+        run: |
+          docker compose -f compose.yml config --quiet
+          docker compose -f compose.yml -f compose.image.yml config --quiet
