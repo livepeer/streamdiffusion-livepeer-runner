@@ -104,11 +104,15 @@ The price is unchanged by the overlay: static runners advertise it from `runners
 
 ## Ship it to an orchestrator
 
-CI publishes the image to `ghcr.io/livepeer/streamdiffusion-livepeer-runner` on `main` and `v*` tags. An operator then runs it with a `runners.json` like this repo's, pointed at wherever they run the container, and needs no credentials for a public package.
+CI publishes the image to `ghcr.io/livepeer/streamdiffusion-livepeer-runner` on `main` and `v*` tags. Tags: `latest` (current `main`), `stable` (latest `v*` release), `1.2` / `1.2.3`, `sha-<short>`. The package is public, so pulling needs no account and no login. An operator then runs it with a `runners.json` like this repo's, pointed at wherever they run the container.
+
+`docker compose up` always builds from source. To run the published image instead, which is the sane path unless you are changing the Dockerfile:
+
+```sh
+docker compose up -d --pull always
+```
 
 The image is **~15 GB** (torch, TensorRT, ONNX Runtime), which is still close enough to what a GitHub-hosted runner has free that [build.yml](.github/workflows/build.yml) reclaims disk before building and skips the build on pull requests. Building locally is `docker compose build`.
-
-To publish to Docker Hub as well, set the repository variable `DOCKERHUB_NAMESPACE` and the secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`. GHCR keeps working either way.
 
 ## Development
 

@@ -14,11 +14,6 @@
 # and the driver arrives through the container runtime.
 FROM python:3.11-slim
 
-LABEL org.opencontainers.image.title="streamdiffusion-livepeer-runner"
-LABEL org.opencontainers.image.description="daydream's StreamDiffusion realtime-img2img server, packaged unmodified to run as a Livepeer live runner"
-LABEL org.opencontainers.image.source="https://github.com/livepeer/streamdiffusion-livepeer-runner"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
-
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
 ENV HF_HUB_ENABLE_HF_TRANSFER=1
 
