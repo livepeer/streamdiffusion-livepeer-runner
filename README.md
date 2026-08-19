@@ -134,9 +134,13 @@ Layer the overlay to add a remote signer and put the orchestrator on-chain, so t
 ```sh
 cp .env.example .env   # fill in RPC, network, keystore paths, accounts, price cap
 docker compose -f compose.yml -f compose.onchain.yml up -d --build
-ffmpeg ... | uv run client.py --signer http://localhost:7936 | ffplay -f mjpeg -i -
+ffmpeg -f lavfi -i testsrc2=size=512x512:rate=15 -f image2pipe -c:v mjpeg -q:v 5 - \
+  | uv run client.py --signer http://localhost:7936 \
+  | ffplay -f mjpeg -fflags nobuffer -flags low_delay -i -
 docker compose -f compose.yml -f compose.onchain.yml down
 ```
+
+`--signer` is what makes this the paid path: the client only sends its payer address when a signer is configured, so without it the orchestrator cannot build a payment challenge and rejects the session with `402 invalid live runner payment signer address`.
 
 The price is unchanged by the overlay: static runners advertise it from `runners.json` (`price_info.price`, USD per hour by default), which both compose files mount. Keep demo sessions short — the meter runs for as long as the socket is open.
 
