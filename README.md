@@ -104,7 +104,7 @@ The price is unchanged by the overlay: static runners advertise it from `runners
 
 ## Ship it to an orchestrator
 
-CI publishes the image to `ghcr.io/livepeer/streamdiffusion-livepeer-runner` on `main` and `v*` tags. The package is public, so pulling needs no account and no login. An operator then runs it with a `runners.json` like this repo's, pointed at wherever they run the container.
+CI publishes the image to `ghcr.io/livepeer/streamdiffusion-livepeer-runner` on `main` and `v*` tags. Tags: `latest` (current `main`), `stable` (latest `v*` release), `1.2` / `1.2.3`, `sha-<short>`. The package is public, so pulling needs no account and no login. An operator then runs it with a `runners.json` like this repo's, pointed at wherever they run the container.
 
 [compose.image.yml](compose.image.yml) swaps the local build for that image, which is the sane path unless you are changing the Dockerfile:
 

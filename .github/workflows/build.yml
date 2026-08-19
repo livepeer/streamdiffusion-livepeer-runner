@@ -56,6 +56,14 @@ jobs:
             type=sha,format=short
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=stable,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+          # Set here rather than as Dockerfile LABELs: these are passed as --label,
+          # which wins over anything baked in, so one source of truth. The licence
+          # is the payload's (Apache-2.0) plus this wrapper's (MIT).
+          labels: |
+            org.opencontainers.image.title=streamdiffusion-livepeer-runner
+            org.opencontainers.image.description=daydream's StreamDiffusion, packaged to run on the Livepeer live runner; example, not production-ready
+            org.opencontainers.image.licenses=Apache-2.0 AND MIT
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v4
